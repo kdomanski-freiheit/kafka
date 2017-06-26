@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -529,7 +530,7 @@ func TestConsumer(t *testing.T) {
 		t.Fatalf("cannot create consumer: %s", err)
 	}
 
-	msg1, err := consumer.Consume()
+	msg1, err := consumer.Consume(context.Background())
 	if err != nil {
 		t.Fatalf("expected no errors, got %s", err)
 	}
@@ -537,7 +538,7 @@ func TestConsumer(t *testing.T) {
 		t.Fatalf("expected different message than %#v", msg1)
 	}
 
-	msg2, err := consumer.Consume()
+	msg2, err := consumer.Consume(context.Background())
 	if err != nil {
 		t.Fatalf("expected no errors, got %s", err)
 	}
@@ -728,7 +729,7 @@ func TestConsumerRetry(t *testing.T) {
 		t.Fatalf("cannot create consumer: %s", err)
 	}
 
-	if _, err := consumer.Consume(); err != ErrNoData {
+	if _, err := consumer.Consume(context.Background()); err != ErrNoData {
 		t.Fatalf("expected %s error, got %s", ErrNoData, err)
 	}
 	if fetchCallCount != 6 {
@@ -781,7 +782,7 @@ func TestConsumeInvalidOffset(t *testing.T) {
 		t.Fatalf("cannot create consumer: %s", err)
 	}
 
-	msg, err := consumer.Consume()
+	msg, err := consumer.Consume(context.Background())
 	if err != nil {
 		t.Fatalf("expected no errors, got %s", err)
 	}
@@ -1516,12 +1517,12 @@ func TestConsumeWhileLeaderChange(t *testing.T) {
 		t.Fatalf("cannot create consumer: %s", err)
 	}
 	// consume twice - once from srv1 and once from srv2
-	if m, err := cons.Consume(); err != nil {
+	if m, err := cons.Consume(context.Background()); err != nil {
 		t.Errorf("cannot consume: %s", err)
 	} else if m.Offset != 1 {
 		t.Errorf("expected offset to be 1, got %+v", m)
 	}
-	if m, err := cons.Consume(); err != nil {
+	if m, err := cons.Consume(context.Background()); err != nil {
 		t.Errorf("cannot consume: %s", err)
 	} else if m.Offset != 2 {
 		t.Errorf("expected offset to be 2, got %+v", m)
@@ -1609,7 +1610,7 @@ func TestConsumerFailover(t *testing.T) {
 	}
 
 	for {
-		msg, err := consumer.Consume()
+		msg, err := consumer.Consume(context.Background())
 		if err != nil {
 			t.Fatalf("failed to consume: %s", err)
 		}
@@ -1617,7 +1618,7 @@ func TestConsumerFailover(t *testing.T) {
 			t.Fatalf("expected first message got %#q", msg)
 		}
 
-		msg, err = consumer.Consume()
+		msg, err = consumer.Consume(context.Background())
 		if err != nil {
 			t.Fatalf("failed to consume: %s", err)
 		}
@@ -1625,7 +1626,7 @@ func TestConsumerFailover(t *testing.T) {
 			t.Fatalf("expected second message got %#q", msg)
 		}
 
-		if msg, err := consumer.Consume(); err != ErrNoData {
+		if msg, err := consumer.Consume(context.Background()); err != ErrNoData {
 			t.Fatalf("expected no data, got %#v (%#q)", err, msg)
 		}
 
@@ -1806,7 +1807,7 @@ func TestFetchOffset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create consumer: %s", err)
 	}
-	msg, err := consumer.Consume()
+	msg, err := consumer.Consume(context.Background())
 	if err != nil {
 		t.Fatalf("cannot consume message: %s", err)
 	}
@@ -1992,14 +1993,14 @@ func TestConsumerBrokenPipe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create consumer: %s", err)
 	}
-	if _, err = consumer.Consume(); err != nil {
+	if _, err = consumer.Consume(context.Background()); err != nil {
 		t.Fatalf("cannot consume: %s", err)
 	}
 
 	srv1.Close()
 
 	// this should succeed after reconnecting to second node
-	if _, err = consumer.Consume(); err != nil {
+	if _, err = consumer.Consume(context.Background()); err != nil {
 		t.Fatalf("cannot consume: %s", err)
 	}
 }
@@ -2185,7 +2186,7 @@ func benchmarkConsumer(b *testing.B, messagesPerResp int) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := consumer.Consume()
+		_, err := consumer.Consume(context.Background())
 		if err != nil {
 			b.Fatalf("cannot fetch message: %s", err)
 		}
@@ -2255,7 +2256,7 @@ func benchmarkConsumerConcurrent(b *testing.B, concurrentConsumers int) {
 		go func(c Consumer) {
 			defer wg.Done()
 			for i := 0; i < b.N/concurrentConsumers; i++ {
-				_, err := c.Consume()
+				_, err := c.Consume(context.Background())
 				if err != nil {
 					b.Fatalf("cannot fetch message: %s", err)
 				}

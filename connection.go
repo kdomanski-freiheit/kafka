@@ -3,6 +3,7 @@ package kafka
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -235,10 +236,16 @@ func (c *connection) Produce(req *proto.ProduceReq) (*proto.ProduceResp, error) 
 
 // Fetch sends given fetch request to kafka node and returns related response.
 // Calling this method on closed connection will always return ErrClosed.
-func (c *connection) Fetch(req *proto.FetchReq) (*proto.FetchResp, error) {
-	var ok bool
-	if req.CorrelationID, ok = <-c.nextID; !ok {
-		return nil, c.stopErr
+func (c *connection) Fetch(ctx context.Context, req *proto.FetchReq) (*proto.FetchResp, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case id, ok := <-c.nextID:
+		if ok {
+			req.CorrelationID = id
+		} else {
+			return nil, c.stopErr
+		}
 	}
 
 	respc, err := c.respWaiter(req.CorrelationID)
@@ -252,11 +259,18 @@ func (c *connection) Fetch(req *proto.FetchReq) (*proto.FetchResp, error) {
 		c.releaseWaiter(req.CorrelationID)
 		return nil, err
 	}
-	b, ok := <-respc
-	if !ok {
-		return nil, c.stopErr
+	var data []byte
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case b, ok := <-respc:
+		if !ok {
+			return nil, c.stopErr
+		} else {
+			data = b
+		}
 	}
-	resp, err := proto.ReadFetchResp(bytes.NewReader(b))
+	resp, err := proto.ReadFetchResp(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}

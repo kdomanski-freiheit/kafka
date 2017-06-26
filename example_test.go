@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/optiopay/kafka/proto"
@@ -25,7 +26,7 @@ func ExampleConsumer() {
 
 	// read all messages
 	for {
-		msg, err := consumer.Consume()
+		msg, err := consumer.Consume(context.Background())
 		if err != nil {
 			if err == ErrNoData {
 				break

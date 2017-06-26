@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"net"
 	"reflect"
 	"strings"
@@ -331,7 +332,7 @@ func TestConnectionFetch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not conect to test server: %s", err)
 	}
-	resp, err := conn.Fetch(&proto.FetchReq{
+	resp, err := conn.Fetch(context.Background(), &proto.FetchReq{
 		CorrelationID: 1,
 		ClientID:      "tester",
 		Topics: []proto.FetchReqTopic{
@@ -538,7 +539,7 @@ func TestClosedConnectionReader(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		if _, err := conn.Fetch(req); err == nil {
+		if _, err := conn.Fetch(context.Background(), req); err == nil {
 			t.Fatal("fetching from closed connection succeeded")
 		}
 	}
@@ -584,14 +585,14 @@ func TestConnectionReaderAfterEOF(t *testing.T) {
 		},
 	}
 
-	if _, err := conn.Fetch(req); err == nil {
+	if _, err := conn.Fetch(context.Background(), req); err == nil {
 		t.Fatal("fetching from closed connection succeeded")
 	}
 
 	// Wait until testServer3 closes connection
 	time.Sleep(time.Millisecond * 50)
 
-	if _, err := conn.Fetch(req); err == nil {
+	if _, err := conn.Fetch(context.Background(), req); err == nil {
 		t.Fatal("fetching from closed connection succeeded")
 	}
 }

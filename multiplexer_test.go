@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ type fetcher struct {
 	errors   []error
 }
 
-func (f *fetcher) Consume() (*proto.Message, error) {
+func (f *fetcher) Consume(ctx context.Context) (*proto.Message, error) {
 	// sleep a bit to let the other's work
 	time.Sleep(time.Microsecond * 500)
 
@@ -110,7 +111,7 @@ type blockingFetcher struct {
 	stop chan struct{}
 }
 
-func (f *blockingFetcher) Consume() (*proto.Message, error) {
+func (f *blockingFetcher) Consume(ctx context.Context) (*proto.Message, error) {
 	<-f.stop
 	return nil, errors.New("blocking fetcher is done")
 }

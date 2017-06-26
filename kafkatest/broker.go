@@ -1,6 +1,7 @@
 package kafkatest
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -144,7 +145,7 @@ type Consumer struct {
 // Consume returns message or error pushed through consumers Messages and Errors
 // channel. Function call will block until data on at least one of those
 // channels is available.
-func (c *Consumer) Consume() (*proto.Message, error) {
+func (c *Consumer) Consume(ctx context.Context) (*proto.Message, error) {
 	select {
 	case msg := <-c.Messages:
 		msg.Topic = c.conf.Topic
@@ -152,6 +153,8 @@ func (c *Consumer) Consume() (*proto.Message, error) {
 		return msg, nil
 	case err := <-c.Errors:
 		return nil, err
+	case <-ctx.Done():
+		return nil, ctx.Err()
 	}
 }
 

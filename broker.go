@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -50,7 +51,7 @@ type Client interface {
 // Consume reads a message from a consumer, returning an error when
 // encountered.
 type Consumer interface {
-	Consume() (*proto.Message, error)
+	Consume(context.Context) (*proto.Message, error)
 }
 
 // BatchConsumer is the interface that wraps the ConsumeBatch method.
@@ -1026,12 +1027,12 @@ func (b *Broker) consumer(conf ConsumerConf) (*consumer, error) {
 // consume can retry sending request on common errors. This behaviour can
 // be configured with RetryErrLimit and RetryErrWait consumer configuration
 // attributes.
-func (c *consumer) consume() ([]*proto.Message, error) {
+func (c *consumer) consume(ctx context.Context) ([]*proto.Message, error) {
 	var msgbuf []*proto.Message
 	var retry int
 	for len(msgbuf) == 0 {
 		var err error
-		msgbuf, err = c.fetch()
+		msgbuf, err = c.fetch(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1049,13 +1050,13 @@ func (c *consumer) consume() ([]*proto.Message, error) {
 	return msgbuf, nil
 }
 
-func (c *consumer) Consume() (*proto.Message, error) {
+func (c *consumer) Consume(ctx context.Context) (*proto.Message, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	if len(c.msgbuf) == 0 {
 		var err error
-		c.msgbuf, err = c.consume()
+		c.msgbuf, err = c.consume(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -1071,7 +1072,7 @@ func (c *consumer) ConsumeBatch() ([]*proto.Message, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	batch, err := c.consume()
+	batch, err := c.consume(context.TODO())
 	if err != nil {
 		return nil, err
 	}
@@ -1083,7 +1084,7 @@ func (c *consumer) ConsumeBatch() ([]*proto.Message, error) {
 // fetch and return next batch of messages. In case of certain set of errors,
 // retry sending fetch request. Retry behaviour can be configured with
 // RetryErrLimit and RetryErrWait consumer configuration attributes.
-func (c *consumer) fetch() ([]*proto.Message, error) {
+func (c *consumer) fetch(ctx context.Context) ([]*proto.Message, error) {
 	req := proto.FetchReq{
 		ClientID:    c.broker.conf.ClientID,
 		MaxWaitTime: c.conf.RequestTimeout,
@@ -1106,7 +1107,11 @@ func (c *consumer) fetch() ([]*proto.Message, error) {
 consumeRetryLoop:
 	for retry := 0; retry < c.conf.RetryErrLimit; retry++ {
 		if retry != 0 {
-			time.Sleep(c.conf.RetryErrWait)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(c.conf.RetryErrWait):
+			}
 		}
 
 		if c.conn == nil {
@@ -1118,7 +1123,7 @@ consumeRetryLoop:
 			c.conn = conn
 		}
 
-		resp, err := c.conn.Fetch(&req)
+		resp, err := c.conn.Fetch(ctx, &req)
 		resErr = err
 
 		if _, ok := err.(*net.OpError); ok || err == io.EOF || err == syscall.EPIPE {

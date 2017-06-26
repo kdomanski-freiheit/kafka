@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -58,7 +59,7 @@ func Merge(consumers ...Consumer) *Mx {
 			}()
 
 			for {
-				msg, err := c.Consume()
+				msg, err := c.Consume(context.TODO())
 				if err != nil {
 					if err == ErrNoData {
 						return
