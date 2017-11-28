@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -101,7 +102,7 @@ func TestProducerBrokenConnection(t *testing.T) {
 			continue
 		}
 		for i := 0; i < 2; i++ {
-			if _, err := consumer.Consume(); err != nil {
+			if _, err := consumer.Consume(context.TODO()); err != nil {
 				t.Errorf("cannot consume %d message from %q: %s", i, name, err)
 			}
 		}
@@ -195,7 +196,7 @@ func TestConsumerBrokenConnection(t *testing.T) {
 			continue
 		}
 		for i := 0; i < msgPerTopic; i++ {
-			if _, err := consumer.Consume(); err != nil {
+			if _, err := consumer.Consume(context.TODO()); err != nil {
 				t.Errorf("cannot consume %d message from %q: %s", i, name, err)
 			}
 		}
@@ -255,7 +256,7 @@ func TestNewTopic(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cannot create consumer for %q: %s", topic, err)
 	}
-	if _, err := consumer.Consume(); err != nil {
+	if _, err := consumer.Consume(context.TODO()); err != nil {
 		t.Errorf("cannot consume message from %q: %s", topic, err)
 	}
 }
