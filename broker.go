@@ -1124,6 +1124,9 @@ consumeRetryLoop:
 		}
 
 		resp, err := c.conn.Fetch(ctx, &req)
+		if err != nil && err == ctx.Err() {
+			return nil, err
+		}
 		resErr = err
 
 		if _, ok := err.(*net.OpError); ok || err == io.EOF || err == syscall.EPIPE {
