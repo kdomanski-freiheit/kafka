@@ -9,6 +9,7 @@ import (
 	"hash/crc32"
 	"io"
 	"io/ioutil"
+	"sync"
 	"time"
 
 	"github.com/golang/snappy"
@@ -119,6 +120,12 @@ func ComputeCrc(m *Message, compression Compression) uint32 {
 	return crc32.ChecksumIEEE(buf.Bytes())
 }
 
+var gzipWriterPool = sync.Pool{
+	New: func() interface{} {
+		return gzip.NewWriter(nil)
+	},
+}
+
 // writeMessageSet writes a Message Set into w.
 // It returns the number of bytes written and any error.
 func writeMessageSet(w io.Writer, messages []*Message, compression Compression) (int, error) {
@@ -132,11 +139,16 @@ func writeMessageSet(w io.Writer, messages []*Message, compression Compression) 
 	switch compression {
 	case CompressionGzip:
 		var buf bytes.Buffer
-		gz := gzip.NewWriter(&buf)
-		if _, err := writeMessageSet(gz, messages, CompressionNone); err != nil {
-			return 0, err
-		}
-		if err := gz.Close(); err != nil {
+		err := func() error {
+			gz := gzipWriterPool.Get().(*gzip.Writer)
+			defer gzipWriterPool.Put(gz)
+			gz.Reset(&buf)
+			if _, err := writeMessageSet(gz, messages, CompressionNone); err != nil {
+				return err
+			}
+			return gz.Close()
+		}()
+		if err != nil {
 			return 0, err
 		}
 		messages = []*Message{
